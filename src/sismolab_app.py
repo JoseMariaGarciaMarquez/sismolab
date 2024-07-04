@@ -30,7 +30,7 @@ Para más información y detalles sobre el funcionamiento de la aplicación, con
 
 """
 
-import csv
+import sys
 import math
 import numpy as np
 import pandas as pd
@@ -38,7 +38,7 @@ import tkinter as tk
 from obspy import read
 from tkinter import filedialog, messagebox, simpledialog, ttk
 import matplotlib.pyplot as plt
-import sys
+
 
 # Coordenadas de las estaciones de referencia
 CUIG = [19.329, -99.178]  # El Pozo (Ciudad Universitaria, Coyoacán, Ciudad de México)
@@ -52,7 +52,7 @@ SRIG = [27.32, -112.241]   # Santa Rosalía (Baja California Sur)
 PPIG = [19.067, -98.628]   # Popocatépetl
 
 
-output_path = "/Users/Chemitas/Desktop/Desk/proyectos/seislab/picking.csv"
+output_path = "examples/picking.csv"
 
 class TextRedirector(object):
     def __init__(self, widget, tag="stdout"):
@@ -76,7 +76,6 @@ class SeismogramApp:
         self.st = None
         self.picking_mode = False
 
-        # Crear los botones
         self.load_button = ttk.Button(self.root, text="Load Data", command=self.load_data)
         self.load_button.pack(pady=10)
 
@@ -148,6 +147,11 @@ class SeismogramApp:
             print("Click was outside the axes")
 
     def save_to_csv(self, amplitude, time):
+        """"
+        Guarda los datos de amplitud y tiempo en un archivo CSV.
+        :param amplitude: amplitud
+        :param time: tiempo
+        """
         try:
             data = {'Amplitude': [amplitude], 'Time': [time]}
             df = pd.DataFrame(data)
