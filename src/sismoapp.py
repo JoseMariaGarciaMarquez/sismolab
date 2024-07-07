@@ -4,6 +4,7 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from obspy import read
 import math
 from geopy.distance import geodesic
@@ -47,27 +48,43 @@ class SeismogramApp:
         
         self.st = None
         self.picking_mode = False
+        self.gain = 1.0  # Inicializar el gain en 1.0
 
-        self.load_button = ttk.Button(self.root, text="Load Data", command=self.load_data)
+        self.control_frame = ttk.Frame(self.root)
+        self.control_frame.grid(row=0, column=0, padx=10, pady=10)
+
+        self.plot_frame = ttk.Frame(self.root)
+        self.plot_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        self.load_button = ttk.Button(self.control_frame, text="Load Data", command=self.load_data)
         self.load_button.pack(pady=10)
 
-        self.picking_button = ttk.Button(self.root, text="Toggle Picking Mode", command=self.toggle_picking)
+        self.picking_button = ttk.Button(self.control_frame, text="Toggle Picking Mode", command=self.toggle_picking)
         self.picking_button.pack(pady=10)
 
-        self.distance_button = ttk.Button(self.root, text="Calculate Distance", command=self.calculate_distance)
+        self.distance_button = ttk.Button(self.control_frame, text="Calculate Distance", command=self.calculate_distance)
         self.distance_button.pack(pady=10)
 
-        self.magnitude_w_button = ttk.Button(self.root, text="Calculate Moment Magnitude", command=lambda: self.calculate_magnitude('w'))
+        self.magnitude_w_button = ttk.Button(self.control_frame, text="Calculate Moment Magnitude", command=lambda: self.calculate_magnitude('w'))
         self.magnitude_w_button.pack(pady=10)
 
-        self.magnitude_e_button = ttk.Button(self.root, text="Calculate Energy Magnitude", command=lambda: self.calculate_magnitude('e'))
+        self.magnitude_e_button = ttk.Button(self.control_frame, text="Calculate Energy Magnitude", command=lambda: self.calculate_magnitude('e'))
         self.magnitude_e_button.pack(pady=10)
 
-        self.map_button = ttk.Button(self.root, text="Generar Mapa", command=self.generate_map)
+        self.map_button = ttk.Button(self.control_frame, text="Generar Mapa", command=self.generate_map)
         self.map_button.pack(pady=10)
 
-        self.text_terminal = tk.Text(self.root, height=10, state="disabled")
+        self.text_terminal = tk.Text(self.control_frame, height=10, state="disabled")
         self.text_terminal.pack(pady=10)
+
+        self.gain_frame = ttk.Frame(self.plot_frame)
+        self.gain_frame.pack(side=tk.BOTTOM, pady=10)
+
+        self.increase_gain_button = ttk.Button(self.gain_frame, text="+", command=self.increase_gain)
+        self.increase_gain_button.pack(side=tk.LEFT, padx=5)
+
+        self.decrease_gain_button = ttk.Button(self.gain_frame, text="-", command=self.decrease_gain)
+        self.decrease_gain_button.pack(side=tk.LEFT, padx=5)
 
         sys.stdout = TextRedirector(self.text_terminal, "stdout")
 
@@ -75,7 +92,7 @@ class SeismogramApp:
         ruta = filedialog.askopenfilename()
         try:
             self.st = read(ruta)
-            self.seismogram()
+            self.plot_seismogram()
         except Exception as e:
             messagebox.showerror("Error", "Error al cargar el archivo\n" + str(e))
 
@@ -84,21 +101,28 @@ class SeismogramApp:
         status = "activado" if self.picking_mode else "desactivado"
         messagebox.showinfo("Modo Picking", f"Modo Picking {status}")
 
-    def seismogram(self):
+    def plot_seismogram(self):
+        for widget in self.plot_frame.winfo_children():
+            if widget != self.gain_frame:
+                widget.destroy()
+
         self.fig, self.axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
         components = ['Z', 'N', 'E']
         for i, tr in enumerate(self.st):
-            self.axs[i].plot(tr.times("utcdatetime"), tr.data, c='black', linewidth=0.5)
+            self.axs[i].plot(tr.times("utcdatetime"), self.gain * tr.data, c='black', linewidth=0.5)
             self.axs[i].set_ylabel("Amplitud")
             self.axs[i].set_title(f"Componente {components[i]}")
             self.axs[i].grid()
         self.axs[2].set_xlabel("Tiempo [s]")
         self.fig.suptitle(f"Estación: {self.st[0].stats.station}\n Start Time: {self.st[0].stats.starttime}\n End Time: {self.st[0].stats.endtime}")
         self.fig.canvas.mpl_connect('button_press_event', self.click_event)
-        plt.show()
+
+        canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
     def click_event(self, event):
-        if self.fig.canvas.toolbar.mode != '': 
+        if not self.fig.canvas.toolbar or self.fig.canvas.toolbar.mode != '': 
             return 
 
         if not self.picking_mode:
@@ -113,7 +137,7 @@ class SeismogramApp:
             idx = np.argmin(time_diff)
             
             if 0 <= idx < len(tr.data):
-                amplitude = tr.data[idx]
+                amplitude = self.gain * tr.data[idx]
                 time = times[idx]
                 self.save_to_csv(amplitude, time)
                 self.mark_picking_point(ax, time, amplitude)
@@ -246,6 +270,14 @@ class SeismogramApp:
         except Exception as e:
             messagebox.showerror("Error", f"Error al generar el mapa\n{e}")
 
+    def increase_gain(self):
+        self.gain *= 1.2
+        self.plot_seismogram()
+
+    def decrease_gain(self):
+        self.gain /= 1.2
+        self.plot_seismogram()
+
 # Función para añadir círculos y marcadores
 def add_circle_and_marker(location, radius, color, popup, map_obj):
     folium.Marker(location=location, popup=popup).add_to(map_obj)
@@ -302,8 +334,9 @@ def maping(csv_file):
 # Llamar a la función principal
 def main():
     root = tk.Tk()
+    root.grid_columnconfigure(1, weight=1)
+    root.grid_rowconfigure(0, weight=1)
     app = SeismogramApp(root)
     root.mainloop()
 
 main()
-
