@@ -1,0 +1,16 @@
+name: sismolab
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pandas
+  - folium
+  - scipy
+  - geopy
+  - obspy
+  - numpy
+  - matplotlib
+  - tkinter
+  - pip
+  - pip:
+    - tk
