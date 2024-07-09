@@ -27,6 +27,7 @@ import math
 from geopy.distance import geodesic
 import folium
 from scipy.optimize import minimize
+from PIL import ImageTk, Image
 
 output_path = "picks/picking.csv"
 distance_output_path = "files/distances.csv"
@@ -65,8 +66,8 @@ class SeismogramApp:
         
         self.st = None
         self.picking_mode = False
-        self.gain = 1.0  # Inicializar el gain en 1.0
-        self.lines = []  # Almacena las líneas de los gráficos
+        self.gain = 1.0  
+        self.lines = []  
 
         self.main_frame = ttk.Frame(self.root)
         self.main_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
@@ -116,7 +117,20 @@ class SeismogramApp:
         self.reset_gain_button = ttk.Button(self.gain_frame, text="Reset", command=self.reset_gain)
         self.reset_gain_button.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
 
+        # Load and display the image
+        self.load_image("images/icon.jpeg")
+
         sys.stdout = TextRedirector(self.text_terminal, "stdout")
+
+    def load_image(self, path):
+        try:
+            img = Image.open(path)
+            img = img.resize((150, 150), Image.ANTIALIAS)
+            self.photo = ImageTk.PhotoImage(img)
+            self.image_label = ttk.Label(self.gain_frame, image=self.photo)
+            self.image_label.grid(row=3, column=0, padx=5, pady=5, sticky="nsew")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al cargar la imagen\n{e}")
 
     def load_data(self):
         ruta = filedialog.askopenfilename()
@@ -351,8 +365,7 @@ def maping(csv_file):
     station_radii = []
 
     for station, distance in zip(stations, distances):
-        if station in stations_coords:
-            location = stations_coords[station]
+        if (location := stations_coords.get(station)) is not None:
             add_circle_and_marker(location, distance, 'crimson', station, m)
             station_locations.append(location)
             station_radii.append(distance)

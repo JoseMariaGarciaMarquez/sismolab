@@ -2,75 +2,74 @@ import pandas as pd
 import folium
 from scipy.optimize import minimize
 from geopy.distance import geodesic
+from obspy import read
+import matplotlib.pyplot as plt
 
-# Coordenadas de las estaciones de referencia
-stations_coords = {
-    'CUIG': [19.329, -99.178],  # El Pozo (Ciudad Universitaria, Coyoacán, Ciudad de México)
-    'CAIG': [17.048, -100.267],  # El Cayaco (Coyuca de Benítez, Guerrero)
-    'CMIG': [17.091, -94.884],   # Matías Romero (Oaxaca)
-    'HUIG': [15.769, -96.108],   # Huatulco (Oaxaca)
-    'OXIG': [17.072, -96.733],   # Oaxaca (Oaxaca)
-    'PLIG': [18.392, -99.502],   # Platanillo (Iguala, Guerrero)
-    'LPIG': [24.101, -110.309],  # La Paz (Baja California Sur)
-    'SRIG': [27.32, -112.241],   # Santa Rosalía (Baja California Sur)
-    'PPIG': [19.067, -98.628]    # Popocatépetl
-}
+# Leer los datos del seismograma
+st = read('data/ee140418.o27')
+st.plot()
 
-# Función para añadir círculos y marcadores
-def add_circle_and_marker(location, radius, color, popup, map_obj):
-    folium.Marker(location=location, popup=popup).add_to(map_obj)
-    folium.Circle(
-        location=location,
-        radius=radius * 1000,  # Convertir km a metros
-        color=color,
-        fill=True,
-        fill_color=color
-    ).add_to(map_obj)
+# Extraer los datos de los componentes
+z_data = st[0].data
+n_data = st[1].data
+e_data = st[2].data
 
-# Función objetivo para minimizar
-def objective_function(point, stations, radii):
-    return sum(abs(geodesic(point, stations[i]).km - radii[i]) for i in range(len(stations)))
+# Plotear los componentes del seismograma
+fig, axs = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+axs[0].plot(z_data, color='black')
+axs[0].set_title('Componente Z')
+axs[1].plot(n_data, color='black')
+axs[1].set_title('Componente N')
+axs[2].plot(e_data, color='black')
+axs[2].set_title('Componente E')
+plt.xlabel('Tiempo')
+plt.show()
 
-def maping(csv_file):
-    df = pd.read_csv(csv_file)
-    stations = df['station']
-    distances = df['distance']
+import numpy as np
 
-    # Crear un mapa centrado en México
-    m = folium.Map(location=[23.6345, -102.5528], zoom_start=5)
+def autopicking(z_data, n_data, e_data, threshold_p=0.5, threshold_s=0.3):
+    """
+    Identifica los arribos de las ondas P y S en un seismograma.
+    
+    :param z_data: Datos del componente Z.
+    :param n_data: Datos del componente N.
+    :param e_data: Datos del componente E.
+    :param threshold_p: Umbral para la detección de la onda P.
+    :param threshold_s: Umbral para la detección de la onda S.
+    :return: Indices de los arribos de las ondas P y S.
+    """
+    # Normalizar los datos
+    z_norm = z_data / np.max(np.abs(z_data))
+    n_norm = n_data[:len(z_norm)] / np.max(np.abs(n_data[:len(z_norm)]))
+    e_norm = e_data[:len(z_norm)] / np.max(np.abs(e_data[:len(z_norm)]))
 
-    station_locations = []
-    station_radii = []
+    # Identificación del arribo de la onda P
+    p_index = np.argmax(z_norm > threshold_p)
+    
+    # Identificación del arribo de la onda S
+    # Usamos la suma de los componentes horizontales para detectar la onda S
+    horizontal_sum = np.abs(n_norm) + np.abs(e_norm)
+    s_index = p_index + np.argmax(horizontal_sum[p_index:] > threshold_s)
 
-    for station, distance in zip(stations, distances):
-        if station in stations_coords:
-            location = stations_coords[station]
-            add_circle_and_marker(location, distance, 'crimson', station, m)
-            station_locations.append(location)
-            station_radii.append(distance)
-        else:
-            print(f'Estación {station} no encontrada')
+    return p_index, s_index
 
-    if len(station_locations) > 1:
-        # Punto inicial para la optimización (promedio de las coordenadas)
-        initial_point = [
-            sum(coord[0] for coord in station_locations) / len(station_locations),
-            sum(coord[1] for coord in station_locations) / len(station_locations)
-        ]
+# Usar la función de autopicking en los datos del seismograma
+p_index, s_index = autopicking(z_data, n_data, e_data)
 
-        # Optimización para encontrar el punto de intersección
-        result = minimize(objective_function, initial_point, args=(station_locations, station_radii), method='Nelder-Mead')
-        epicenter = result.x
+# Mostrar los resultados
+print(f"Arribo de la onda P: {p_index}")
+print(f"Arribo de la onda S: {s_index}")
 
-        # Agregar marcador del epicentro
-        folium.Marker(location=epicenter, popup=f'Epicentro: {epicenter[0]:.4f}, {epicenter[1]:.4f}', icon=folium.Icon(icon='star', color='orange')).add_to(m)
-
-    # Guardar el mapa con los círculos
-    m.save('examples/map.html')
-    print("Map saved as examples/map.html")
-
-# Llamar a la función principal
-def main():
-    maping('examples/mapfile.csv')
-
-main()
+# Plotear los resultados
+fig, axs = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+axs[0].plot(z_data, color='black')
+axs[0].axvline(p_index, color='red', linestyle='--', label='P Arrival')
+axs[0].set_title('Componente Z')
+axs[1].plot(n_data, color='black')
+axs[1].axvline(s_index, color='blue', linestyle='--', label='S Arrival')
+axs[1].set_title('Componente N')
+axs[2].plot(e_data, color='black')
+axs[2].axvline(s_index, color='blue', linestyle='--', label='S Arrival')
+axs[2].set_title('Componente E')
+plt.xlabel('Tiempo')
+plt.show()
