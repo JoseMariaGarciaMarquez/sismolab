@@ -1,3 +1,20 @@
+""""
+SISMOLAB - Aplicación para el análisis de sismogramas
+Esta aplicación permite cargar un archivo de sismograma en formato MiniSEED y realizar las siguientes operaciones:
+- Modo Picking: Permite seleccionar manualmente los tiempos de llegada de las ondas P y S.
+- Cálculo de Distancia: Calcula la distancia epicentral a partir de los tiempos de llegada de las ondas P y S.
+- Cálculo de Magnitud de Momento (Mw): Calcula la magnitud de momento a partir de la amplitud de las ondas P y S.
+- Cálculo de Magnitud de Energía (ME): Calcula la magnitud de energía a partir de la amplitud de las ondas P y S.
+- Generación de Mapa: Genera un mapa con los círculos de error de las estaciones y el epicentro estimado.
+
+Autor :José María García Márquez
+- Email: josemariagarciamarquez2.72@gmail.com
+- Github: https://www.github.com/JoseMariaGarciaMarquez
+- LinkedIn: https://www.linkedin.com/in/josé-maría-garcía-márquez-556a75199/
+- Webpage: https://www.josemaria.me
+- PayPal: https://www.paypal.com/paypalme/Chemitas96
+- Patreon: https://patreon.com/chemitas
+"""
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import sys
@@ -58,46 +75,46 @@ class SeismogramApp:
         self.control_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
         self.gain_frame = ttk.Frame(self.main_frame)
-        self.gain_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        self.gain_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
         self.plot_frame = ttk.Frame(self.main_frame)
-        self.plot_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=10, sticky="nsew")
+        self.plot_frame.grid(row=0, column=2, rowspan=2, padx=10, pady=10, sticky="nsew")
 
-        self.root.grid_columnconfigure(1, weight=1)
+        self.root.grid_columnconfigure(2, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
 
         style = ttk.Style()
-        style.configure("TButton", padding=5, relief="flat", font=('Helvetica', 10))
+        style.configure("TButton", padding=5, relief="flat", font=('Helvetica', 10), width=8)
 
-        self.load_button = ttk.Button(self.control_frame, text="Load Data", command=self.load_data)
-        self.load_button.grid(row=0, column=0, pady=5, sticky="ew")
+        self.load_button = ttk.Button(self.control_frame, text="Load", command=self.load_data)
+        self.load_button.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
 
-        self.picking_button = ttk.Button(self.control_frame, text="Toggle Picking Mode", command=self.toggle_picking)
-        self.picking_button.grid(row=1, column=0, pady=5, sticky="ew")
+        self.picking_button = ttk.Button(self.control_frame, text="Picking", command=self.toggle_picking)
+        self.picking_button.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
 
-        self.distance_button = ttk.Button(self.control_frame, text="Calculate Distance", command=self.calculate_distance)
-        self.distance_button.grid(row=2, column=0, pady=5, sticky="ew")
+        self.distance_button = ttk.Button(self.control_frame, text="Distance", command=self.calculate_distance)
+        self.distance_button.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
 
-        self.magnitude_w_button = ttk.Button(self.control_frame, text="Calculate Moment Magnitude", command=lambda: self.calculate_magnitude('w'))
-        self.magnitude_w_button.grid(row=3, column=0, pady=5, sticky="ew")
+        self.magnitude_w_button = ttk.Button(self.control_frame, text="Mw", command=lambda: self.calculate_magnitude('w'))
+        self.magnitude_w_button.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
 
-        self.magnitude_e_button = ttk.Button(self.control_frame, text="Calculate Energy Magnitude", command=lambda: self.calculate_magnitude('e'))
-        self.magnitude_e_button.grid(row=4, column=0, pady=5, sticky="ew")
+        self.magnitude_e_button = ttk.Button(self.control_frame, text="ME", command=lambda: self.calculate_magnitude('e'))
+        self.magnitude_e_button.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
 
-        self.map_button = ttk.Button(self.control_frame, text="Generar Mapa", command=self.generate_map)
-        self.map_button.grid(row=5, column=0, pady=5, sticky="ew")
+        self.map_button = ttk.Button(self.control_frame, text="Maps", command=self.generate_map)
+        self.map_button.grid(row=2, column=1, padx=5, pady=5, sticky="nsew")
 
         self.text_terminal = tk.Text(self.control_frame, height=10, state="disabled")
-        self.text_terminal.grid(row=6, column=0, pady=5, sticky="ew")
+        self.text_terminal.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
 
         self.increase_gain_button = ttk.Button(self.gain_frame, text="+", command=self.increase_gain)
-        self.increase_gain_button.grid(row=0, column=0, pady=5, sticky="ew")
+        self.increase_gain_button.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
 
         self.decrease_gain_button = ttk.Button(self.gain_frame, text="-", command=self.decrease_gain)
-        self.decrease_gain_button.grid(row=1, column=0, pady=5, sticky="ew")
+        self.decrease_gain_button.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
 
-        self.reset_gain_button = ttk.Button(self.gain_frame, text="Reset Gain", command=self.reset_gain)
-        self.reset_gain_button.grid(row=2, column=0, pady=5, sticky="ew")
+        self.reset_gain_button = ttk.Button(self.gain_frame, text="Reset", command=self.reset_gain)
+        self.reset_gain_button.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
 
         sys.stdout = TextRedirector(self.text_terminal, "stdout")
 
