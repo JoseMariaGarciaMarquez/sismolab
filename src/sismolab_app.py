@@ -4,6 +4,7 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from obspy import read
 import math
 from geopy.distance import geodesic
@@ -47,27 +48,56 @@ class SeismogramApp:
         
         self.st = None
         self.picking_mode = False
+        self.gain = 1.0  # Inicializar el gain en 1.0
+        self.lines = []  # Almacena las líneas de los gráficos
 
-        self.load_button = ttk.Button(self.root, text="Load Data", command=self.load_data)
-        self.load_button.pack(pady=10)
+        self.main_frame = ttk.Frame(self.root)
+        self.main_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.picking_button = ttk.Button(self.root, text="Toggle Picking Mode", command=self.toggle_picking)
-        self.picking_button.pack(pady=10)
+        self.control_frame = ttk.Frame(self.main_frame)
+        self.control_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.distance_button = ttk.Button(self.root, text="Calculate Distance", command=self.calculate_distance)
-        self.distance_button.pack(pady=10)
+        self.gain_frame = ttk.Frame(self.main_frame)
+        self.gain_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.magnitude_w_button = ttk.Button(self.root, text="Calculate Moment Magnitude", command=lambda: self.calculate_magnitude('w'))
-        self.magnitude_w_button.pack(pady=10)
+        self.plot_frame = ttk.Frame(self.main_frame)
+        self.plot_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=10, sticky="nsew")
 
-        self.magnitude_e_button = ttk.Button(self.root, text="Calculate Energy Magnitude", command=lambda: self.calculate_magnitude('e'))
-        self.magnitude_e_button.pack(pady=10)
+        self.root.grid_columnconfigure(1, weight=1)
+        self.root.grid_rowconfigure(0, weight=1)
 
-        self.map_button = ttk.Button(self.root, text="Generar Mapa", command=self.generate_map)
-        self.map_button.pack(pady=10)
+        style = ttk.Style()
+        style.configure("TButton", padding=5, relief="flat", font=('Helvetica', 10))
 
-        self.text_terminal = tk.Text(self.root, height=10, state="disabled")
-        self.text_terminal.pack(pady=10)
+        self.load_button = ttk.Button(self.control_frame, text="Load Data", command=self.load_data)
+        self.load_button.grid(row=0, column=0, pady=5, sticky="ew")
+
+        self.picking_button = ttk.Button(self.control_frame, text="Toggle Picking Mode", command=self.toggle_picking)
+        self.picking_button.grid(row=1, column=0, pady=5, sticky="ew")
+
+        self.distance_button = ttk.Button(self.control_frame, text="Calculate Distance", command=self.calculate_distance)
+        self.distance_button.grid(row=2, column=0, pady=5, sticky="ew")
+
+        self.magnitude_w_button = ttk.Button(self.control_frame, text="Calculate Moment Magnitude", command=lambda: self.calculate_magnitude('w'))
+        self.magnitude_w_button.grid(row=3, column=0, pady=5, sticky="ew")
+
+        self.magnitude_e_button = ttk.Button(self.control_frame, text="Calculate Energy Magnitude", command=lambda: self.calculate_magnitude('e'))
+        self.magnitude_e_button.grid(row=4, column=0, pady=5, sticky="ew")
+
+        self.map_button = ttk.Button(self.control_frame, text="Generar Mapa", command=self.generate_map)
+        self.map_button.grid(row=5, column=0, pady=5, sticky="ew")
+
+        self.text_terminal = tk.Text(self.control_frame, height=10, state="disabled")
+        self.text_terminal.grid(row=6, column=0, pady=5, sticky="ew")
+
+        self.increase_gain_button = ttk.Button(self.gain_frame, text="+", command=self.increase_gain)
+        self.increase_gain_button.grid(row=0, column=0, pady=5, sticky="ew")
+
+        self.decrease_gain_button = ttk.Button(self.gain_frame, text="-", command=self.decrease_gain)
+        self.decrease_gain_button.grid(row=1, column=0, pady=5, sticky="ew")
+
+        self.reset_gain_button = ttk.Button(self.gain_frame, text="Reset Gain", command=self.reset_gain)
+        self.reset_gain_button.grid(row=2, column=0, pady=5, sticky="ew")
 
         sys.stdout = TextRedirector(self.text_terminal, "stdout")
 
@@ -75,7 +105,7 @@ class SeismogramApp:
         ruta = filedialog.askopenfilename()
         try:
             self.st = read(ruta)
-            self.seismogram()
+            self.plot_seismogram()
         except Exception as e:
             messagebox.showerror("Error", "Error al cargar el archivo\n" + str(e))
 
@@ -84,17 +114,27 @@ class SeismogramApp:
         status = "activado" if self.picking_mode else "desactivado"
         messagebox.showinfo("Modo Picking", f"Modo Picking {status}")
 
-    def seismogram(self):
-        self.fig, self.axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+    def plot_seismogram(self):
+        if hasattr(self, 'fig'):
+            self.fig.clear()
+        else:
+            self.fig, self.axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+            self.fig.canvas.mpl_connect('button_press_event', self.click_event)
+
+        self.lines.clear()
         components = ['Z', 'N', 'E']
         for i, tr in enumerate(self.st):
-            self.axs[i].plot(tr.times("utcdatetime"), tr.data, c='black', linewidth=0.5)
+            line, = self.axs[i].plot(tr.times("utcdatetime"), self.gain * tr.data, c='black', linewidth=0.5)
+            self.lines.append(line)
             self.axs[i].set_ylabel("Amplitud")
             self.axs[i].set_title(f"Componente {components[i]}")
             self.axs[i].grid()
+
+            # Ajustar los límites del eje Y
+            self.axs[i].set_ylim(np.min(tr.data) * 1.2, np.max(tr.data) * 1.2)
+        
         self.axs[2].set_xlabel("Tiempo [s]")
         self.fig.suptitle(f"Estación: {self.st[0].stats.station}\n Start Time: {self.st[0].stats.starttime}\n End Time: {self.st[0].stats.endtime}")
-        self.fig.canvas.mpl_connect('button_press_event', self.click_event)
         plt.show()
 
     def click_event(self, event):
@@ -113,8 +153,9 @@ class SeismogramApp:
             idx = np.argmin(time_diff)
             
             if 0 <= idx < len(tr.data):
-                amplitude = tr.data[idx]
+                amplitude = self.gain * tr.data[idx]
                 time = times[idx]
+                print(f"Picked point at time: {time}, amplitude: {amplitude}")
                 self.save_to_csv(amplitude, time)
                 self.mark_picking_point(ax, time, amplitude)
         else:
@@ -123,12 +164,14 @@ class SeismogramApp:
     def mark_picking_point(self, ax, time, amplitude):
         ax.plot(time, amplitude, 'ro')  # Marca el punto de picking en la gráfica
         self.fig.canvas.draw()  # Actualiza la gráfica
+        print(f"Marked point at time: {time}, amplitude: {amplitude}")
 
     def save_to_csv(self, amplitude, time):
         try:
             data = {'Amplitude': [amplitude], 'Time': [time]}
             df = pd.DataFrame(data)
             df.to_csv(output_path, mode='a', header=not pd.io.common.file_exists(output_path), index=False)
+            print(f"Saved point to CSV: time: {time}, amplitude: {amplitude}")
         except Exception as e:
             print(f"Error saving data to CSV: {e}")
 
@@ -246,6 +289,24 @@ class SeismogramApp:
         except Exception as e:
             messagebox.showerror("Error", f"Error al generar el mapa\n{e}")
 
+    def increase_gain(self):
+        self.gain *= 1.2
+        for i, tr in enumerate(self.st):
+            self.lines[i].set_ydata(self.gain * tr.data)
+        self.fig.canvas.draw()
+
+    def decrease_gain(self):
+        self.gain /= 1.2
+        for i, tr in enumerate(self.st):
+            self.lines[i].set_ydata(self.gain * tr.data)
+        self.fig.canvas.draw()
+
+    def reset_gain(self):
+        self.gain = 1.0
+        for i, tr in enumerate(self.st):
+            self.lines[i].set_ydata(self.gain * tr.data)
+        self.fig.canvas.draw()
+
 # Función para añadir círculos y marcadores
 def add_circle_and_marker(location, radius, color, popup, map_obj):
     folium.Marker(location=location, popup=popup).add_to(map_obj)
@@ -306,4 +367,3 @@ def main():
     root.mainloop()
 
 main()
-

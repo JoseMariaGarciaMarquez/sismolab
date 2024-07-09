@@ -113,6 +113,10 @@ class SeismogramApp:
             self.axs[i].set_ylabel("Amplitud")
             self.axs[i].set_title(f"Componente {components[i]}")
             self.axs[i].grid()
+
+            # Ajustar los límites del eje Y
+            self.axs[i].set_ylim(np.min(tr.data) * 1.2, np.max(tr.data) * 1.2)
+        
         self.axs[2].set_xlabel("Tiempo [s]")
         self.fig.suptitle(f"Estación: {self.st[0].stats.station}\n Start Time: {self.st[0].stats.starttime}\n End Time: {self.st[0].stats.endtime}")
         self.fig.canvas.mpl_connect('button_press_event', self.click_event)
@@ -139,6 +143,7 @@ class SeismogramApp:
             if 0 <= idx < len(tr.data):
                 amplitude = self.gain * tr.data[idx]
                 time = times[idx]
+                print(f"Picked point at time: {time}, amplitude: {amplitude}")
                 self.save_to_csv(amplitude, time)
                 self.mark_picking_point(ax, time, amplitude)
         else:
@@ -147,12 +152,14 @@ class SeismogramApp:
     def mark_picking_point(self, ax, time, amplitude):
         ax.plot(time, amplitude, 'ro')  # Marca el punto de picking en la gráfica
         self.fig.canvas.draw()  # Actualiza la gráfica
+        print(f"Marked point at time: {time}, amplitude: {amplitude}")
 
     def save_to_csv(self, amplitude, time):
         try:
             data = {'Amplitude': [amplitude], 'Time': [time]}
             df = pd.DataFrame(data)
             df.to_csv(output_path, mode='a', header=not pd.io.common.file_exists(output_path), index=False)
+            print(f"Saved point to CSV: time: {time}, amplitude: {amplitude}")
         except Exception as e:
             print(f"Error saving data to CSV: {e}")
 
