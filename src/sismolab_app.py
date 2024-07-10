@@ -46,6 +46,9 @@ stations_coords = {
 }
 
 class TextRedirector(object):
+    """"
+    Clase para redirigir la salida estándar a un widget de texto en la interfaz gráfica.
+    """
     def __init__(self, widget, tag="stdout"):
         self.widget = widget
         self.tag = tag
@@ -60,6 +63,9 @@ class TextRedirector(object):
         pass
 
 class SeismogramApp:
+    """"
+    This class represents the main application window.
+    """
     def __init__(self, root):
         self.root = root
         self.root.title("SISMOLAB")
@@ -161,7 +167,6 @@ class SeismogramApp:
             self.axs[i].set_title(f"Componente {components[i]}")
             self.axs[i].grid()
 
-            # Ajustar los límites del eje Y
             self.axs[i].set_ylim(np.min(tr.data) * 1.2, np.max(tr.data) * 1.2)
         
         self.axs[2].set_xlabel("Tiempo [s]")
