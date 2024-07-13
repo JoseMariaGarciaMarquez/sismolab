@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 
 from obspy import read
 
-def autoP_icking(z_data, z_time, window_size=5, window_step=5):
+def autoP_icking(z_data, z_time):
+    window_size = 5
+    window_step=window_size
+
     num_windows = int((len(z_data) - window_size) / window_step) + 1
-
-    window_means = []
-    window_stds = []
     classification = []
-
+    
     found_wave = False
     p_wave_time = None
     p_wave_amplitude = None
@@ -23,7 +23,6 @@ def autoP_icking(z_data, z_time, window_size=5, window_step=5):
 
         window = z_data[start:end]
         mean_w = np.mean(window)
-        std_w = np.std(window)
 
         start_next = start + window_step
         end_next = start_next + window_size
@@ -32,7 +31,6 @@ def autoP_icking(z_data, z_time, window_size=5, window_step=5):
 
         window_next = z_data[start_next:end_next]
         mean_next = np.mean(window_next)
-        std_next = np.std(window_next)
 
         n = 3
 
