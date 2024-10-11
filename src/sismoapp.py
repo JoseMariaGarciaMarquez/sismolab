@@ -27,6 +27,8 @@ stations_coords = {
     'PPIG': [19.067, -98.628]    # Popocatépetl
 }
 
+# Función para llamar a los filtros
+
 # Función para auto-picking de la onda P
 def autoP_icking(z_data, z_time):
     window_size = 5

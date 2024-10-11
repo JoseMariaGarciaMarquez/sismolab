@@ -7,7 +7,57 @@ Solo usarse en sismos mayores a 6.0 grados.
 import time
 import numpy as np
 from obspy import read
+from scipy.fft import fft, fftshift, ifft, ifftshift
 
+def fourier_regin(senal):
+    """"
+    Esta función calcula la tansformada de Fourier, la F0 y la Frecuencia de Nyquist
+    Construye el dominio de Fourier como un numpy arange a partir de F0 y FN
+    Regresa una lista de arreglos en donde el primer elemento es el espectro de amplitud
+    Y el segundo elemento es el dominio de las frecuencias 
+    """
+    N = len(senal.times())
+    dt = senal.stats.delta
+    F0 = 1 / (N * dt)
+    FN = 1 / (2 * dt)
+    F = np.arange(-FN, FN-F0, F0)
+    SENAL = fftshift(fft(senal))
+    frecuencia_esquina(F, SENAL)
+    return [SENAL, F]
+
+def frecuencia_esquina(F, SENAL):
+    """"
+    Esta función calcula la frecuencia de la esquina usando la transformada de fourier de la señal
+    Usa la función argmax para encontrar la posición del valor máximo del espectro de amplitud
+    Y regresa el valor de la frecuencia en el vector F correspondiente al valor máximo del espectro
+    """
+    pos = np.argmax(SENAL)
+    frecuencia_esquina = abs(F[pos])
+    return frecuencia_esquina
+
+
+def pasa_bandas(senal):
+    """
+    Esta función filtra la señal y pasa una banda de frecuencias entre 15 y 30 segundos
+    Funciona con la función de magnitud por amplitud para evitar una sobresaturación
+    Recibe la señal a filtrar, y los valores de las frecuencias de corte son constantes
+    Usa la función fourier_regin para calcular la transformada de Fourier
+    Y diseña un filtro pasabandas, regresa la señal filtrada como un numpy array    
+    """
+    fc1 = 1/30
+    fc2 = 1/15
+    PBAN = np.zeros_like(senal)
+    fourier = fourier_regin(senal)
+    SENAL = fourier[0]
+    F = fourier[1]
+    for i in range(len(PBAN)):
+        if fc1 <= abs(F[i]) <= fc2:
+            PBAN[i] = 1
+
+    SENAL_PBAN = SENAL * PBAN
+    sn_pban = ifft(ifftshift(SENAL_PBAN))
+
+    return sn_pban
 
 def auto_picking(z_data):
     """
@@ -81,7 +131,7 @@ def magnitude_energy(st):
         raise ValueError("No se pudo encontrar la amplitud de la onda P")
 
 def magnitude_amplitude(st):
-    z_data, n_data, e_data = st[0].data, st[1].data, st[2].data
+    z_data, n_data, e_data = pasa_bandas(st[0].data), pasa_bandas(st[1].data), pasa_bandas(st[2].data)
     amp_z, amp_n, amp_e = np.max(z_data), np.max(n_data), np.max(e_data)
     A = np.sqrt(amp_z**2 + amp_n**2 + amp_e**2)
     p_wave_amplitude = auto_picking(z_data)
@@ -93,7 +143,7 @@ def magnitude_amplitude(st):
 
 def main():
     start_time = time.time() 
-    st = read('data/ee140418.o27')
+    st = read('data\\ee140418.o27')
     magnitude = magnitude_amplitude(st)
     print(f"Magnitud de Amplitud: {round(magnitude,1)}")
 
